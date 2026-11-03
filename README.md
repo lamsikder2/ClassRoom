@@ -46,3 +46,4 @@ flutter build apk --release # Android APK
 
 ## 📄 License
 Private & Proprietary - ClassRoom.
+# ClassRoom
