@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="ClassRoom - শিক্ষার্থীদের ডিজিটাল পাঠশালা ও প্রস্তুতি মঞ্চ">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="ClassRoom">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Google Sign-in Client ID -->
+  <meta name="google-signin-client_id" content="1024179326506-9gue9fu3b7sg9pf8qg4403lfndc5cbiq.apps.googleusercontent.com">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>ClassRoom - শিক্ষার্থীদের ডিজিটাল পাঠশালা</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+    #loading-screen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+      z-index: 999999;
+      transition: opacity 0.35s ease-out, visibility 0.35s ease-out;
+    }
+    .brand-icon {
+      width: 68px;
+      height: 68px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      animation: pulse-logo 2s ease-in-out infinite;
+    }
+    .brand-title {
+      font-size: 26px;
+      font-weight: 800;
+      color: #312e81;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+    .brand-subtitle {
+      font-size: 14px;
+      color: #64748b;
+      margin-bottom: 28px;
+      text-align: center;
+      max-width: 280px;
+    }
+    .loader-bar {
+      width: 160px;
+      height: 5px;
+      background-color: #e2e8f0;
+      border-radius: 10px;
+      overflow: hidden;
+      position: relative;
+    }
+    .loader-bar::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 45%;
+      background: linear-gradient(90deg, #4f46e5, #818cf8);
+      border-radius: 10px;
+      animation: indeterminate 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse-logo {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.04); }
+    }
+    @keyframes indeterminate {
+      0% { left: -45%; }
+      100% { left: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div id="loading-screen">
+    <div class="brand-icon">
+      <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+        <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+      </svg>
+    </div>
+    <div class="brand-title">ClassRoom</div>
+    <div class="brand-subtitle">ডিজিটাল পাঠশালা ও প্রস্তুতি মঞ্চ</div>
+    <div class="loader-bar"></div>
+  </div>
+
+  <script>
+    function removeLoader() {
+      const el = document.getElementById('loading-screen');
+      if (el) {
+        el.style.opacity = '0';
+        el.style.visibility = 'hidden';
+        setTimeout(() => el.remove(), 400);
+      }
+    }
+    window.addEventListener('flutter-first-frame', removeLoader);
+    // Fallback safety timeout if event doesn't fire
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        if (window._flutter && window._flutter.loader) {
+          // Keep loader until flutter view rendered
+        }
+      }, 3000);
+    });
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

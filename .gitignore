@@ -1,0 +1,47 @@
+# Node & Next.js
+apps/admin/node_modules/
+apps/admin/.next/
+apps/admin/out/
+apps/admin/build/
+
+# Flutter & Dart
+apps/mobile/.dart_tool/
+apps/mobile/.flutter-plugins
+apps/mobile/.flutter-plugins-dependencies
+apps/mobile/build/
+apps/mobile/.packages
+apps/mobile/.pub/
+apps/mobile/ios/Flutter/Generated.xcconfig
+apps/mobile/ios/Flutter/app.framework
+apps/mobile/ios/Flutter/Flutter.framework
+apps/mobile/ios/Flutter/Flutter.podspec
+apps/mobile/android/local.properties
+
+# Environment files & secrets
+.env
+.env.local
+.env.*.local
+*.env
+env.json
+client_secret*.json
+
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+.agents/
+.claude/
+agent/
+.mcp.json
+skills-lock.json
+
+
+
+# Build artifacts
+*.apk
+*.aab
+
+
