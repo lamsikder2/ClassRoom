@@ -11,7 +11,6 @@ import '../../../core/utils/bengali_utils.dart';
 import '../../../shared/components/empty_state.dart';
 import '../../../shared/components/shimmer_loading.dart';
 import '../data/lessons_repository.dart';
-import 'custom_video_controls.dart';
 
 class LessonDetailScreen extends ConsumerStatefulWidget {
   final String lessonId;
@@ -99,19 +98,18 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
       videoId = videoId.split('youtu.be/')[1].split('?')[0];
     }
 
-    // Initialize custom-controlled YouTube player without native branding
+    // Initialize YouTube player with native embedded controls
     _ytController = YoutubePlayerController.fromVideoId(
       videoId: videoId,
       autoPlay: false,
       params: const YoutubePlayerParams(
-        showFullscreenButton: false,
-        showControls: false,
+        showFullscreenButton: true,
+        showControls: true,
         showVideoAnnotations: false,
         enableCaption: false,
         privacyEnhancedMode: true,
         strictRelatedVideos: true,
         playsInline: true,
-        enableKeyboard: false,
       ),
     );
 
@@ -201,14 +199,29 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
                       ),
                     ),
                   ),
-                  CustomVideoControls(
-                    controller: _ytController!,
-                    title: lesson.title,
-                    isFullscreen: true,
-                    onToggleFullscreen: _toggleFullscreen,
-                    fallbackDuration: lesson.videoDurationSec != null
-                        ? Duration(seconds: lesson.videoDurationSec!)
-                        : null,
+                  // Prominent floating button to return to portrait mode
+                  Positioned(
+                    top: 16,
+                    left: 16,
+                    child: SafeArea(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.black.withOpacity(0.75),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            side: const BorderSide(color: Colors.white30),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        ),
+                        icon: const Icon(LucideIcons.minimize2, size: 16),
+                        label: const Text(
+                          'স্বাভাবিক মোডে ফিরুন (Portrait)',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                        onPressed: _toggleFullscreen,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -225,29 +238,37 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Top Video Player Section
-                if (_ytController != null)
+                // Top Video Player Section (Native Clean Embed)
+                if (_ytController != null) ...[
                   AspectRatio(
                     aspectRatio: 16 / 9,
-                    child: Stack(
-                      children: [
-                        YoutubePlayer(
-                          controller: _ytController!,
-                          aspectRatio: 16 / 9,
-                        ),
-                        CustomVideoControls(
-                          controller: _ytController!,
-                          title: lesson.title,
-                          isFullscreen: false,
-                          onToggleFullscreen: _toggleFullscreen,
-                          fallbackDuration: lesson.videoDurationSec != null
-                              ? Duration(seconds: lesson.videoDurationSec!)
-                              : null,
-                        ),
-                      ],
+                    child: YoutubePlayer(
+                      controller: _ytController!,
+                      aspectRatio: 16 / 9,
                     ),
-                  )
-                else
+                  ),
+                  // Dedicated Landscape Button below video player
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary600,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(LucideIcons.maximize2, size: 18),
+                      label: const Text(
+                        'ভিডিও বড় করে শোয়াইয়া দেখুন (Landscape Mode)',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                      onPressed: _toggleFullscreen,
+                    ),
+                  ),
+                ] else
                   AspectRatio(
                     aspectRatio: 16 / 9,
                     child: Container(
