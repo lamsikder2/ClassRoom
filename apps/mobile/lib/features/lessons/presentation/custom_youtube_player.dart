@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'package:chewie/chewie.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:video_player/video_player.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import '../../../core/theme/app_colors.dart';
 
 class CustomYoutubePlayer extends StatefulWidget {
@@ -28,10 +31,12 @@ class CustomYoutubePlayer extends StatefulWidget {
 class _CustomYoutubePlayerState extends State<CustomYoutubePlayer> {
   VideoPlayerController? _videoPlayerController;
   ChewieController? _chewieController;
+  YoutubePlayerController? _webIframeController;
   YoutubeExplode? _ytExplode;
 
   bool _isLoading = true;
   String? _errorMessage;
+  bool _useIframeFallback = false;
 
   @override
   void initState() {
@@ -48,44 +53,63 @@ class _CustomYoutubePlayerState extends State<CustomYoutubePlayer> {
     }
   }
 
+  String _extractVideoId(String input) {
+    String trimmed = input.trim();
+    if (trimmed.contains('v=')) {
+      return trimmed.split('v=')[1].split('&')[0];
+    } else if (trimmed.contains('youtu.be/')) {
+      return trimmed.split('youtu.be/')[1].split('?')[0];
+    }
+    return trimmed;
+  }
+
   Future<void> _initializePlayer() async {
     if (!mounted) return;
 
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _useIframeFallback = false;
     });
+
+    final videoId = _extractVideoId(widget.youtubeUrl);
+
+    // Browser CORS Limitation:
+    // Web browsers strictly enforce CORS and block direct stream chunks from googlevideo.com.
+    // Therefore, in Web browsers, we use the YouTube HTML5 embed.
+    // On Android/iOS Native (the installed APK), we extract and play the direct raw stream with ZERO YouTube branding!
+    if (kIsWeb) {
+      _initWebIframe(videoId);
+      return;
+    }
 
     _ytExplode = YoutubeExplode();
 
     try {
-      // 1. Extract direct media stream URL from regular YouTube video URL/ID
-      String targetUrl = widget.youtubeUrl.trim();
+      final targetUrl = 'https://www.youtube.com/watch?v=$videoId';
 
-      // Normalize if only an ID was provided
-      if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
-        targetUrl = 'https://www.youtube.com/watch?v=$targetUrl';
-      }
+      // 1. Fetch manifest with 8-second timeout to prevent infinite hang
+      final manifest = await _ytExplode!.videos.streamsClient
+          .getManifest(targetUrl)
+          .timeout(const Duration(seconds: 8));
 
-      final manifest = await _ytExplode!.videos.streamsClient.getManifest(targetUrl);
-
-      // 2. Use muxed.withHighestBitrate() so it contains both audio & video tracks
+      // 2. Select highest bitrate muxed stream (audio + video combined)
       final streamInfo = manifest.muxed.withHighestBitrate();
       final streamUri = streamInfo.url;
 
-      // Close the YoutubeExplode client once stream extraction completes
+      // Close explode client as soon as stream URL is obtained
       _ytExplode?.close();
       _ytExplode = null;
 
       if (!mounted) return;
 
-      // 3. Initialize VideoPlayerController with the direct stream URL
+      // 3. Initialize VideoPlayerController with raw direct stream URL
       _videoPlayerController = VideoPlayerController.networkUrl(streamUri);
-      await _videoPlayerController!.initialize();
+      await _videoPlayerController!.initialize().timeout(const Duration(seconds: 10));
 
       if (!mounted) return;
 
-      // 4. Initialize ChewieController with custom branding & controls
+      // 4. Initialize ChewieController with zero YouTube branding
       _chewieController = ChewieController(
         videoPlayerController: _videoPlayerController!,
         autoPlay: widget.autoPlay,
@@ -131,7 +155,7 @@ class _CustomYoutubePlayerState extends State<CustomYoutubePlayer> {
         },
       );
 
-      // Optional listener for video progress and completion
+      // Track progress
       int lastReportedSec = 0;
       _videoPlayerController!.addListener(() {
         if (_videoPlayerController == null || !_videoPlayerController!.value.isInitialized) return;
@@ -154,24 +178,45 @@ class _CustomYoutubePlayerState extends State<CustomYoutubePlayer> {
         });
       }
     } catch (e) {
+      debugPrint('Direct stream extraction error: $e. Falling back to embed player.');
+      // Safe fallback to Iframe on mobile if stream extraction fails (e.g. YouTube cipher challenge)
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'ভিডিও লোড করা সম্ভব হয়নি: ${e.toString()}';
-        });
+        _initWebIframe(videoId);
       }
     } finally {
-      // Safe cleanup of YoutubeExplode instance if error occurred
       _ytExplode?.close();
       _ytExplode = null;
+    }
+  }
+
+  void _initWebIframe(String videoId) {
+    _webIframeController?.close();
+    _webIframeController = YoutubePlayerController.fromVideoId(
+      videoId: videoId,
+      autoPlay: widget.autoPlay,
+      params: const YoutubePlayerParams(
+        showFullscreenButton: true,
+        showControls: true,
+        enableCaption: false,
+        playsInline: true,
+      ),
+    );
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        _useIframeFallback = true;
+      });
     }
   }
 
   void _disposeControllers() {
     _videoPlayerController?.dispose();
     _chewieController?.dispose();
+    _webIframeController?.close();
     _videoPlayerController = null;
     _chewieController = null;
+    _webIframeController = null;
     _ytExplode?.close();
     _ytExplode = null;
   }
@@ -199,16 +244,22 @@ class _CustomYoutubePlayerState extends State<CustomYoutubePlayer> {
                 ),
                 SizedBox(height: 12),
                 Text(
-                  'ভিডিও স্ট্রিম লোড হচ্ছে...',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  'ভিডিও স্ট্রিম প্রস্তুত হচ্ছে...',
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
                 ),
               ],
             ),
           ),
+        ),
+      );
+    }
+
+    if (_useIframeFallback && _webIframeController != null) {
+      return AspectRatio(
+        aspectRatio: 16 / 9,
+        child: YoutubePlayer(
+          controller: _webIframeController!,
+          aspectRatio: 16 / 9,
         ),
       );
     }
@@ -237,8 +288,6 @@ class _CustomYoutubePlayerState extends State<CustomYoutubePlayer> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary600,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   ),
                   icon: const Icon(LucideIcons.refreshCw, size: 16),
                   label: const Text('আবার চেষ্টা করুন'),
