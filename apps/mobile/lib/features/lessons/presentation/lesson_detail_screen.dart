@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -10,6 +11,7 @@ import '../../../core/utils/bengali_utils.dart';
 import '../../../shared/components/empty_state.dart';
 import '../../../shared/components/shimmer_loading.dart';
 import '../data/lessons_repository.dart';
+import 'custom_video_controls.dart';
 
 class LessonDetailScreen extends ConsumerStatefulWidget {
   final String lessonId;
@@ -28,12 +30,20 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
   Timer? _progressTimer;
   int _lastSyncedPosition = 0;
   bool _isDescriptionExpanded = false;
+  bool _isManuallyFullscreen = false;
 
   @override
   void initState() {
     super.initState();
     // Enable screen protection to prevent screen recording and screenshots of classes
     ScreenProtectionService.enableProtection();
+
+    // Allow both portrait and landscape orientation when viewing a class video
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
   }
 
   @override
@@ -41,7 +51,41 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
     _progressTimer?.cancel();
     _ytController?.close();
     ScreenProtectionService.disableProtection();
+
+    // Reset back to portrait and default system UI
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
     super.dispose();
+  }
+
+  void _toggleFullscreen() {
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    if (isLandscape || _isManuallyFullscreen) {
+      // Exit fullscreen -> Switch to Portrait
+      setState(() => _isManuallyFullscreen = false);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
+      // Re-enable rotation after a short delay so sensor can still work
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (mounted) {
+          SystemChrome.setPreferredOrientations([
+            DeviceOrientation.portraitUp,
+            DeviceOrientation.landscapeLeft,
+            DeviceOrientation.landscapeRight,
+          ]);
+        }
+      });
+    } else {
+      // Enter fullscreen -> Switch to Landscape
+      setState(() => _isManuallyFullscreen = true);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    }
   }
 
   void _initPlayer(String videoRef) {
@@ -55,13 +99,19 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
       videoId = videoId.split('youtu.be/')[1].split('?')[0];
     }
 
+    // Initialize custom-controlled YouTube player without native branding
     _ytController = YoutubePlayerController.fromVideoId(
       videoId: videoId,
       autoPlay: false,
       params: const YoutubePlayerParams(
-        showFullscreenButton: true,
-        showControls: true,
+        showFullscreenButton: false,
+        showControls: false,
+        showVideoAnnotations: false,
         enableCaption: false,
+        privacyEnhancedMode: true,
+        strictRelatedVideos: true,
+        playsInline: true,
+        enableKeyboard: false,
       ),
     );
 
@@ -87,37 +137,91 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final detailAsync = ref.watch(lessonDetailProvider(widget.lessonId));
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape || _isManuallyFullscreen;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('ক্লাস রুম', style: TextStyle(fontWeight: FontWeight.bold)),
+    return detailAsync.when(
+      loading: () => Scaffold(
+        appBar: AppBar(
+          title: const Text('ক্লাস রুম', style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
+        body: const ShimmerListPlaceholder(count: 3),
       ),
-      body: detailAsync.when(
-        loading: () => const ShimmerListPlaceholder(count: 3),
-        error: (err, _) => EmptyStateWidget(
+      error: (err, _) => Scaffold(
+        appBar: AppBar(
+          title: const Text('ক্লাস রুম', style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
+        body: EmptyStateWidget(
           title: 'ক্লাস লোড করা যায়নি',
           description: err.toString(),
           actionLabel: 'আবার চেষ্টা করুন',
           onAction: () => ref.refresh(lessonDetailProvider(widget.lessonId)),
         ),
-        data: (data) {
-          if (data == null) {
-            return const EmptyStateWidget(
+      ),
+      data: (data) {
+        if (data == null) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('ক্লাস রুম', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            body: const EmptyStateWidget(
               title: 'ক্লাস পাওয়া যায়নি',
               description: 'অনুরোধকৃত ক্লাসটি খুঁজে পাওয়া যায়নি বা মুছে ফেলা হয়েছে।',
-            );
-          }
+            ),
+          );
+        }
 
-          final lesson = data.lesson;
-          final materials = data.materials;
-          final exams = data.exams;
+        final lesson = data.lesson;
+        final materials = data.materials;
+        final exams = data.exams;
 
-          // Initialize video player if videoRef exists
-          if (lesson.videoRef != null && lesson.videoRef!.isNotEmpty && _ytController == null) {
-            _initPlayer(lesson.videoRef!);
-          }
+        // Initialize video player if videoRef exists
+        if (lesson.videoRef != null && lesson.videoRef!.isNotEmpty && _ytController == null) {
+          _initPlayer(lesson.videoRef!);
+        }
 
-          return SingleChildScrollView(
+        // Fullscreen Landscape View
+        if (isLandscape && _ytController != null) {
+          return PopScope(
+            canPop: false,
+            onPopInvokedWithResult: (didPop, result) {
+              if (didPop) return;
+              _toggleFullscreen();
+            },
+            child: Scaffold(
+              backgroundColor: Colors.black,
+              body: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Center(
+                    child: AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: YoutubePlayer(
+                        controller: _ytController!,
+                        aspectRatio: 16 / 9,
+                      ),
+                    ),
+                  ),
+                  CustomVideoControls(
+                    controller: _ytController!,
+                    title: lesson.title,
+                    isFullscreen: true,
+                    onToggleFullscreen: _toggleFullscreen,
+                    fallbackDuration: lesson.videoDurationSec != null
+                        ? Duration(seconds: lesson.videoDurationSec!)
+                        : null,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // Portrait Normal View
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('ক্লাস রুম', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          body: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -125,9 +229,22 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
                 if (_ytController != null)
                   AspectRatio(
                     aspectRatio: 16 / 9,
-                    child: YoutubePlayer(
-                      controller: _ytController!,
-                      aspectRatio: 16 / 9,
+                    child: Stack(
+                      children: [
+                        YoutubePlayer(
+                          controller: _ytController!,
+                          aspectRatio: 16 / 9,
+                        ),
+                        CustomVideoControls(
+                          controller: _ytController!,
+                          title: lesson.title,
+                          isFullscreen: false,
+                          onToggleFullscreen: _toggleFullscreen,
+                          fallbackDuration: lesson.videoDurationSec != null
+                              ? Duration(seconds: lesson.videoDurationSec!)
+                              : null,
+                        ),
+                      ],
                     ),
                   )
                 else
@@ -307,9 +424,9 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
                 ),
               ],
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 

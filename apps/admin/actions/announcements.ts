@@ -2,6 +2,7 @@
 
 import { requireAdmin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { broadcastNotification } from "@/lib/notifications";
 import { z } from "zod";
 
 const announcementSchema = z.object({
@@ -40,6 +41,15 @@ export async function createAnnouncementAction(formData: FormData) {
 
   if (error) return { success: false, error: error.message };
 
+  if (parsed.data.isPublished) {
+    await broadcastNotification({
+      title: parsed.data.title,
+      body: parsed.data.body,
+      levelId: parsed.data.levelId,
+      createAnnouncement: false, // already inserted above
+    });
+  }
+
   revalidatePath("/announcements");
   return { success: true };
 }
@@ -72,6 +82,15 @@ export async function updateAnnouncementAction(id: string, formData: FormData) {
     .eq("id", id);
 
   if (error) return { success: false, error: error.message };
+
+  if (parsed.data.isPublished) {
+    await broadcastNotification({
+      title: parsed.data.title,
+      body: parsed.data.body,
+      levelId: parsed.data.levelId,
+      createAnnouncement: false, // already inserted above
+    });
+  }
 
   revalidatePath("/announcements");
   return { success: true };

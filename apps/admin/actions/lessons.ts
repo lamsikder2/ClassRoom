@@ -3,6 +3,7 @@
 import { requireAdmin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { extractYouTubeId } from "@/lib/parsers";
+import { broadcastNotification } from "@/lib/notifications";
 import { z } from "zod";
 
 const lessonSchema = z.object({
@@ -70,6 +71,17 @@ export async function createLessonAction(formData: FormData) {
   }).select("id").single();
 
   if (error) return { success: false, error: error.message };
+
+  // Broadcast notification to students
+  if (parsed.data.isPublished) {
+    await broadcastNotification({
+      title: `নতুন ক্লাস: ${parsed.data.title}`,
+      body: `একটি নতুন ক্লাস আপলোড করা হয়েছে। এখনই অ্যাপে দেখে নাও!`,
+      deepLink: `/lessons/${data.id}`,
+      lessonId: data.id,
+      createAnnouncement: true,
+    });
+  }
 
   revalidatePath("/lessons");
   return { success: true, lessonId: data.id };

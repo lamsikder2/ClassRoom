@@ -3,6 +3,7 @@
 import { requireAdmin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { extractDriveFileId } from "@/lib/parsers";
+import { broadcastNotification } from "@/lib/notifications";
 import { z } from "zod";
 
 const materialSchema = z.object({
@@ -68,6 +69,22 @@ export async function createMaterialAction(formData: FormData) {
   });
 
   if (error) return { success: false, error: error.message };
+
+  // Broadcast notification to students
+  const materialTypeLabel =
+    parsed.data.type === "lecture_sheet"
+      ? "লেকচার শিট"
+      : parsed.data.type === "class_note"
+      ? "ক্লাস নোট"
+      : "স্টাডি মেটেরিয়াল";
+
+  await broadcastNotification({
+    title: `নতুন ${materialTypeLabel}: ${parsed.data.title}`,
+    body: `একটি নতুন ${materialTypeLabel} আপলোড করা হয়েছে। দেখে নাও!`,
+    deepLink: `/lessons/${parsed.data.lessonId}`,
+    lessonId: parsed.data.lessonId,
+    createAnnouncement: true,
+  });
 
   revalidatePath(`/lessons/${parsed.data.lessonId}/materials`);
   return { success: true };

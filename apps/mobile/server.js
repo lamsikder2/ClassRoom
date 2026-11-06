@@ -22,6 +22,7 @@ const MIME_TYPES = {
   '.ttf': 'font/ttf',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
+  '.apk': 'application/vnd.android.package-archive',
 };
 
 const server = http.createServer((req, res) => {

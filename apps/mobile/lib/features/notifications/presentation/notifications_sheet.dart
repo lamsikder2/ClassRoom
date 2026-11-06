@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../core/services/in_app_notification_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/bengali_utils.dart';
 import '../../../shared/components/shimmer_loading.dart';
@@ -87,10 +88,25 @@ class NotificationsSheet extends ConsumerWidget {
                     ),
                   ],
                 ),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(LucideIcons.x, size: 20),
-                  visualDensity: VisualDensity.compact,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'সাউন্ড টেস্ট করুন',
+                      icon: const Icon(LucideIcons.volume2, size: 20, color: AppColors.primary600),
+                      onPressed: () {
+                        InAppNotificationService.show(
+                          title: 'সাউন্ড টেস্ট',
+                          body: 'নোটিফিকেশন সাউন্ড সফলভাবে বাজছে!',
+                        );
+                      },
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(LucideIcons.x, size: 20),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
                 ),
               ],
             ),

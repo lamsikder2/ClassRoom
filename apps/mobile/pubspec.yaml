@@ -56,6 +56,7 @@ dependencies:
     sdk: flutter
   markdown: ^7.3.1
   lucide_icons_flutter: ^4.0.1
+  audioplayers: ^6.8.1
 
 dev_dependencies:
   flutter_test:
@@ -81,6 +82,7 @@ flutter:
 
   assets:
     - assets/icons/
+    - assets/sounds/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

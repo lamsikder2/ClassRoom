@@ -21,6 +21,8 @@ import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/subjects/presentation/chapters_screen.dart';
 import '../../features/subjects/presentation/subjects_screen.dart';
 import '../network/supabase_client.dart';
+import '../services/in_app_notification_service.dart';
+import '../services/notifications_realtime_service.dart';
 import '../theme/app_colors.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -28,6 +30,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   ref.watch(currentSessionProvider);
 
   return GoRouter(
+    navigatorKey: InAppNotificationService.navigatorKey,
     initialLocation: '/dashboard',
     redirect: (context, state) {
       final user = Supabase.instance.client.auth.currentUser;
@@ -170,16 +173,30 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   );
 });
 
-class ScaffoldWithBottomNavBar extends StatelessWidget {
+class ScaffoldWithBottomNavBar extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
   const ScaffoldWithBottomNavBar({super.key, required this.navigationShell});
+
+  @override
+  ConsumerState<ScaffoldWithBottomNavBar> createState() => _ScaffoldWithBottomNavBarState();
+}
+
+class _ScaffoldWithBottomNavBarState extends ConsumerState<ScaffoldWithBottomNavBar> {
+  @override
+  void initState() {
+    super.initState();
+    // Start listening for realtime notifications across the entire app
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(notificationsRealtimeServiceProvider).startListening();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      body: navigationShell,
+      body: widget.navigationShell,
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
@@ -191,10 +208,10 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
           ),
         ),
         child: BottomNavigationBar(
-          currentIndex: navigationShell.currentIndex,
-          onTap: (index) => navigationShell.goBranch(
+          currentIndex: widget.navigationShell.currentIndex,
+          onTap: (index) => widget.navigationShell.goBranch(
             index,
-            initialLocation: index == navigationShell.currentIndex,
+            initialLocation: index == widget.navigationShell.currentIndex,
           ),
           type: BottomNavigationBarType.fixed,
           backgroundColor: Theme.of(context).cardColor,
