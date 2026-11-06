@@ -1,15 +1,14 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import '../../../core/security/screen_protection.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/bengali_utils.dart';
 import '../../../shared/components/empty_state.dart';
 import '../../../shared/components/shimmer_loading.dart';
 import '../data/lessons_repository.dart';
+import 'custom_youtube_player.dart';
 
 class LessonDetailScreen extends ConsumerStatefulWidget {
   final String lessonId;
@@ -24,8 +23,6 @@ class LessonDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
-  YoutubePlayerController? _ytController;
-  Timer? _progressTimer;
   int _lastSyncedPosition = 0;
   bool _isDescriptionExpanded = false;
 
@@ -38,52 +35,8 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
 
   @override
   void dispose() {
-    _progressTimer?.cancel();
-    _ytController?.close();
     ScreenProtectionService.disableProtection();
     super.dispose();
-  }
-
-  void _initPlayer(String videoRef) {
-    if (_ytController != null) return;
-
-    // Clean videoId if full URL was stored
-    String videoId = videoRef;
-    if (videoId.contains('v=')) {
-      videoId = videoId.split('v=')[1].split('&')[0];
-    } else if (videoId.contains('youtu.be/')) {
-      videoId = videoId.split('youtu.be/')[1].split('?')[0];
-    }
-
-    // Clean YouTube Embed player
-    _ytController = YoutubePlayerController.fromVideoId(
-      videoId: videoId,
-      autoPlay: false,
-      params: const YoutubePlayerParams(
-        showFullscreenButton: true,
-        showControls: true,
-        enableCaption: false,
-        playsInline: true,
-      ),
-    );
-
-    // Sync progress every 10 seconds
-    _progressTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
-      if (_ytController == null) return;
-      try {
-        final position = await _ytController!.currentTime;
-        final currentSec = position.toInt();
-        final delta = currentSec - _lastSyncedPosition;
-        if (delta > 0 && delta <= 30) {
-          _lastSyncedPosition = currentSec;
-          ref.read(lessonsRepositoryProvider).updateProgress(
-                lessonId: widget.lessonId,
-                positionSec: currentSec,
-                deltaWatchedSec: delta,
-              );
-        }
-      } catch (_) {}
-    });
   }
 
   @override
@@ -114,23 +67,27 @@ class _LessonDetailScreenState extends ConsumerState<LessonDetailScreen> {
           final materials = data.materials;
           final exams = data.exams;
 
-          // Initialize video player if videoRef exists
-          if (lesson.videoRef != null && lesson.videoRef!.isNotEmpty && _ytController == null) {
-            _initPlayer(lesson.videoRef!);
-          }
-
           return SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Top Video Player Section (Native YouTube Embed)
-                if (_ytController != null)
-                  AspectRatio(
-                    aspectRatio: 16 / 9,
-                    child: YoutubePlayer(
-                      controller: _ytController!,
-                      aspectRatio: 16 / 9,
-                    ),
+                // Top Video Player Section (Direct Media Stream with Zero YouTube Branding)
+                if (lesson.videoRef != null && lesson.videoRef!.isNotEmpty)
+                  CustomYoutubePlayer(
+                    youtubeUrl: lesson.videoRef!,
+                    autoPlay: false,
+                    onPositionChanged: (pos) {
+                      final currentSec = pos.inSeconds;
+                      final delta = currentSec - _lastSyncedPosition;
+                      if (delta > 0 && delta <= 30) {
+                        _lastSyncedPosition = currentSec;
+                        ref.read(lessonsRepositoryProvider).updateProgress(
+                              lessonId: widget.lessonId,
+                              positionSec: currentSec,
+                              deltaWatchedSec: delta,
+                            );
+                      }
+                    },
                   )
                 else
                   AspectRatio(
